@@ -1,6 +1,14 @@
+import sys
+# Render SQLite Bypass: Override the system sqlite3 with pysqlite3-binary if available
+try:
+    __import__('pysqlite3')
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except ImportError:
+    pass
+
 import os 
 from langchain_chroma import Chroma 
-from langchain_mistralai import MistralAIEmbeddings # 1. Import Mistral embeddings
+from langchain_mistralai import MistralAIEmbeddings 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
@@ -8,14 +16,12 @@ CHROMA_DIR = "vector_db"
 COLLECTION_NAME = "meeting_transcript"
 
 def get_embeddings():
-    # 2. Replaced HuggingFaceEmbeddings with Mistral API Embeddings
-    # This runs on Mistral's servers, requiring almost ZERO local RAM!
     return MistralAIEmbeddings(
         model="mistral-embed",
         mistral_api_key=os.environ.get("MISTRAL_API_KEY")
     )
 
-def build_vector_store(segments : list)->Chroma:
+def build_vector_store(segments : list) -> Chroma:
     print("Building vector Store")
 
     docs = []
@@ -59,7 +65,7 @@ def build_vector_store(segments : list)->Chroma:
 
     embeddings = get_embeddings()
     vector_store = Chroma.from_documents(
-        documents= docs,
+        documents=docs,
         embedding=embeddings,
         collection_name=COLLECTION_NAME,
         persist_directory=CHROMA_DIR
@@ -68,18 +74,18 @@ def build_vector_store(segments : list)->Chroma:
     return vector_store
 
 
-def load_vector_store() ->Chroma:
+def load_vector_store() -> Chroma:
     embeddings = get_embeddings()
     vector_store = Chroma(
         collection_name=COLLECTION_NAME,
-        embedding_function= embeddings,
+        embedding_function=embeddings,
         persist_directory=CHROMA_DIR
     )
 
     return vector_store
 
-def get_retriever(vector_store : Chroma, k :int = 4):
+def get_retriever(vector_store : Chroma, k : int = 4):
     return vector_store.as_retriever(
         search_type = 'similarity',
-        search_kwargs = {"k":k}
+        search_kwargs = {"k": k}
     )

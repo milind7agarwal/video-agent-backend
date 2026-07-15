@@ -2,21 +2,24 @@
 # exit on error
 set -o errexit
 
-echo "Installing Python dependencies..."
-pip install -r Requirements.txt fastapi uvicorn pydantic
+# Install python dependencies from Requirements.txt
+pip install -r Requirements.txt
 
-echo "Downloading static ffmpeg binary for Render..."
-wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-tar -xf ffmpeg-release-amd64-static.tar.xz
-rm ffmpeg-release-amd64-static.tar.xz
+# Create a local bin folder in your root directory
+mkdir -p bin
 
-FFMPEG_DIR=$(find . -maxdepth 1 -type d -name "ffmpeg-*-static" | head -n 1)
-
-mkdir -p $HOME/.local/bin
-mv $FFMPEG_DIR/ffmpeg $HOME/.local/bin/
-mv $FFMPEG_DIR/ffprobe $HOME/.local/bin/
-
-# Clean up
-rm -rf $FFMPEG_DIR
-
-echo "Build complete. FFmpeg installed."
+# Download and extract static FFmpeg if it's not already cached/present
+if [ ! -f "bin/ffmpeg" ]; then
+    echo "Downloading static FFmpeg for Render..."
+    wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+    tar -xf ffmpeg-release-amd64-static.tar.xz
+    
+    # Move binaries to the bin/ directory
+    mv ffmpeg-*-static/ffmpeg bin/
+    mv ffmpeg-*-static/ffprobe bin/
+    
+    # Clean up installation archives
+    rm -rf ffmpeg-*-static*
+    chmod +x bin/ffmpeg bin/ffprobe
+    echo "FFmpeg installed successfully in local bin!"
+fi

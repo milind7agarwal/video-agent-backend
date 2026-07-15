@@ -1,26 +1,10 @@
-# ── Audio / Video Acquisition ──
-yt-dlp>=2024.4.9
+fastapi>=0.110.0
+uvicorn>=0.28.0
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-chroma>=0.1.2
+chromadb>=0.5.0
+pysqlite3-binary>=0.5.3
+langchain-mistralai>=0.1.0
 pydub>=0.25.1
-ffmpeg-python>=0.2.0
-
-# ── Translation ──
-deep-translator>=1.11.4
-
-# ── LLM & RAG Orchestration (Cloud API Based) ──
-langchain>=0.2.0
-langchain-core>=0.2.0
-langchain-community>=0.2.0
-langchain-mistralai>=0.1.0        # Connects to Mistral for LLM & Embeddings
-mistralai>=0.4.0
-chromadb>=0.5.0                   # Lightweight client/local vector indexing
-tiktoken>=0.7.0
-
-# ── PDF & TXT Export ──
-reportlab>=4.2.0
-fpdf2>=2.7.9
-
-# ── Utilities ──
-python-dotenv>=1.0.0
-numpy>=1.26.0
-tqdm>=4.66.0
-requests>=2.32.0
+yt-dlp>=2024.3.10
