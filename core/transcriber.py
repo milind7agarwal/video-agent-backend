@@ -1,4 +1,3 @@
-import whisper
 import os
 import requests
 from pydub import AudioSegment
@@ -7,34 +6,9 @@ from pydub import AudioSegment
 # We slice each chunk into 25s pieces (with a 5s safety margin) before sending.
 SARVAM_PIECE_SECONDS = 25
 
-
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
-
-
 SARVAM_API_KEY = os.getenv("SARVAM_API_KEY")
 SARVAM_STT_TRANSLATE_URL = "https://api.sarvam.ai/speech-to-text-translate"
 SARVAM_MODEL = os.getenv("SARVAM_STT_MODEL", "saaras:v2.5")
-
-_model = None
-
-
-def load_model():
-
-    global _model  
-
-    if _model is None: 
-        print(f"Loading Whisper model: {WHISPER_MODEL} ...")
-        _model = whisper.load_model(WHISPER_MODEL) 
-        print("Whisper model loaded.")
-    return _model 
-
-
-def transcribe_chunk_whisper(chunk_path: str) -> list:
-
-    model = load_model()  
-
-    result = model.transcribe(chunk_path, task="transcribe")  
-    return result["segments"]
 
 
 def _send_to_sarvam(piece_path: str) -> str:
@@ -88,24 +62,23 @@ def transcribe_chunk_sarvam(chunk_path: str) -> str:
 
     return [{"start": None, "end": None, "text": full_text.strip()}]
 
+
 def transcribe_chunk(chunk_path: str, language: str = "english") -> list:
     """
-    Route one chunk to Whisper or Sarvam depending on language choice.
-    - english  → Whisper (local model)
-    - hinglish → Sarvam (translates to English while transcribing)
+    Routes transcription to Sarvam AI cloud API.
+    By routing both English and Hinglish to Sarvam's API, we bypass the need 
+    to load local heavy machine learning libraries (like PyTorch and Whisper).
     """
-    if language.lower() == "hinglish":
-        return transcribe_chunk_sarvam(chunk_path)
-    return transcribe_chunk_whisper(chunk_path)
+    # Both languages now run smoothly in the cloud, preventing Render OOM!
+    return transcribe_chunk_sarvam(chunk_path)
 
 
 def transcribe_all(chunks: list, language: str = "english") -> dict:
-
     all_segments = [] 
     full_transcript = ""
 
-    engine = "Sarvam AI" if language.lower() == "hinglish" else "Whisper"
-    print(f"Using {engine} for transcription.")
+    # Clear logging showing we are running a lightweight API-driven flow
+    print(f"Using Sarvam Cloud API for transcription ({language} mode).")
 
     for i, chunk_info in enumerate(chunks):  
         chunk_path = chunk_info["path"]
