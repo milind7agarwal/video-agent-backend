@@ -23,15 +23,17 @@ def format_docs(docs):
             formatted.append(doc.page_content)
     return "\n\n".join(formatted)
 
-# FIX: Expect segments (list) instead of a raw transcript string
-def build_rag_chain(segments: list):
-    # Pass the list of segments containing timestamps to the vector store
-    vector_store = build_vector_store(segments)
-    retriever = get_retriever(vector_store, k=4)
+def build_rag_chain(transcript:str):
+
+    vector_store = build_vector_store(transcript)
+
+    retriever = get_retriever(vector_store, k = 4)
+
     llm = get_llm()
 
-    prompt = ChatPromptTemplate.from_messages([
-        (
+    prompt = ChatPromptTemplate.from_messages(
+
+        [(
             "system",
             """You are an expert meeting assistant. Answer the user's question 
             based ONLY on the meeting transcript context provided below.
@@ -46,16 +48,17 @@ def build_rag_chain(segments: list):
             {context}""",
         ),
         ("human", "{question}"),
-    ])
+    ]
+    )
+
+    #full LCEL Rag pipeline 
 
     rag_chain = (
-        {
-            "context": retriever | RunnableLambda(format_docs),
-            "question": RunnablePassthrough()
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
+
+        {"context" : retriever | RunnableLambda(format_docs),
+         "question": RunnablePassthrough()
+         }
+         |prompt|llm|StrOutputParser()
     )
 
     return rag_chain
@@ -63,8 +66,7 @@ def build_rag_chain(segments: list):
 
 def load_rag_chain():
     vector_store = load_vector_store()
-    # FIX: Pass the loaded vector_store to get_retriever
-    retriever = get_retriever(vector_store)
+    retriver = get_retriever()
 
     llm = get_llm()
     prompt = ChatPromptTemplate.from_messages([
@@ -81,13 +83,13 @@ def load_rag_chain():
 
             Context from meeting transcript:
             {context}""",
-        ),
-        ("human", "{question}"),
+            ),
+            ("human", "{question}"),
     ])
 
     rag_chain = (
         {
-            "context": retriever | RunnableLambda(format_docs),
+            "context":  retriver| RunnableLambda(format_docs),
             "question": RunnablePassthrough(),
         }
         | prompt
@@ -98,7 +100,7 @@ def load_rag_chain():
     return rag_chain
 
 
-def ask_question(rag_chain, question: str) -> str:
+def ask_question(rag_chain, question:str) -> str:
     print(f"Question : {question}")
     answer = rag_chain.invoke(question)
     print(f"answer :{answer}")

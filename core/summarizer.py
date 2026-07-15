@@ -62,6 +62,3 @@ def generate_title(transcipt : str) -> str:
     )
 
     return title_chain.invoke(transcipt[:2000])
-
-
-
