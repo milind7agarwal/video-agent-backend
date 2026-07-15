@@ -1,5 +1,6 @@
 import os
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
+
 import shutil
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -27,6 +28,7 @@ class ProcessRequest(BaseModel):
     source: str
     language: str = "english"
 
+
 class ChatRequest(BaseModel):
     question: str
 
@@ -35,10 +37,12 @@ rag_chain_instance = None
 
 @app.post("/api/process")
 async def process_video(
-    file: UploadFile = File(None), 
-    source: str = Form(None), 
-    language: str = Form("english")
+    file: UploadFile = File(None),
+    source: str | None = Form(None),
+    language: str | None = Form(None),
+    req: Request | None = None,
 ):
+
     global rag_chain_instance
     try:
         print("Starting AI Video Assistant processing")
@@ -57,8 +61,23 @@ async def process_video(
         elif source:
             print(f"Received source text/URL: {source}")
             input_source = source
+        elif req is not None:
+            # If frontend sends JSON, FastAPI won't populate Form() fields.
+            try:
+                body = await req.json()
+            except Exception:
+                body = {}
+            source = body.get("source")
+            language = body.get("language") or language
+
+            if not source:
+                raise HTTPException(status_code=400, detail="No video file or YouTube URL provided.")
+
+            print(f"Received source text/URL (json): {source}")
+            input_source = source
         else:
             raise HTTPException(status_code=400, detail="No video file or YouTube URL provided.")
+
 
         # Process the local /tmp file path or URL
         chunks = process_input(input_source)
@@ -101,7 +120,17 @@ def chat(req: ChatRequest):
             raise HTTPException(status_code=400, detail="RAG chain not initialized. Please process a video first.")
             
     try:
-        answer = ask_question(rag_chain_instance, req.question)
+        # frontend may send incorrect content-type; accept both JSON and form.
+        try:
+            question = req.question
+        except Exception:
+            question = None
+
+        if question is None:
+            raise HTTPException(status_code=400, detail="Missing question")
+
+        answer = ask_question(rag_chain_instance, question)
+
         return {"answer": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
