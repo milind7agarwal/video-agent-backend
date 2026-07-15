@@ -1,5 +1,6 @@
 import os
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
+
 
 import shutil
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,10 +39,9 @@ rag_chain_instance = None
 @app.post("/api/process")
 async def process_video(
     file: UploadFile = File(None),
-    source: str | None = Form(None),
-    language: str | None = Form(None),
     req: Request | None = None,
 ):
+
 
     global rag_chain_instance
     try:
@@ -58,17 +58,15 @@ async def process_video(
                 shutil.copyfileobj(file.file, buffer)
                 
         # 2. Fall back to a text URL if no file was uploaded
-        elif source:
-            print(f"Received source text/URL: {source}")
-            input_source = source
         elif req is not None:
-            # If frontend sends JSON, FastAPI won't populate Form() fields.
+            # Frontend sends JSON: { source, language }
             try:
                 body = await req.json()
             except Exception:
                 body = {}
+
             source = body.get("source")
-            language = body.get("language") or language
+            language = body.get("language") or "english"
 
             if not source:
                 raise HTTPException(status_code=400, detail="No video file or YouTube URL provided.")
@@ -77,6 +75,7 @@ async def process_video(
             input_source = source
         else:
             raise HTTPException(status_code=400, detail="No video file or YouTube URL provided.")
+
 
 
         # Process the local /tmp file path or URL
