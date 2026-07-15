@@ -1,11 +1,22 @@
-import yt_dlp
-from pydub import AudioSegment
 import os
 
-DOWNLOAD_DIR = 'downloades'
-os.makedirs(DOWNLOAD_DIR,exist_ok = True)
+try:
+    import yt_dlp
+except ImportError:  # pragma: no cover - optional dependency
+    yt_dlp = None
 
-def download_yt_audio(url:str)->str:
+try:
+    from pydub import AudioSegment
+except Exception:  # pragma: no cover - handles environments where pydub import fails
+    AudioSegment = None
+
+DOWNLOAD_DIR = 'downloades'
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+def download_yt_audio(url: str) -> str:
+    if yt_dlp is None:
+        raise RuntimeError("yt-dlp is not installed. Install backend dependencies first.")
+
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
     ydl_opts = {
         "format": "bestaudio/best",
@@ -27,16 +38,22 @@ def download_yt_audio(url:str)->str:
 
 def convert_to_wav(input_path: str) -> str:
     """Convert any audio/video file to WAV format using pydub."""
+    if AudioSegment is None:
+        raise RuntimeError("pydub is not available in this environment.")
+
     output_path = os.path.splitext(input_path)[0] + "_converted.wav"
     audio = AudioSegment.from_file(input_path)
-    audio = audio.set_channels(1).set_frame_rate(16000) #16khz
+    audio = audio.set_channels(1).set_frame_rate(16000)  # 16khz
     audio.export(output_path, format="wav")
     return output_path
 
 
-def chunk_audio(wav_path : str , chunk_minutes : int = 10) -> list:
+def chunk_audio(wav_path: str, chunk_minutes: int = 10) -> list:
+    if AudioSegment is None:
+        raise RuntimeError("pydub is not available in this environment.")
+
     audio = AudioSegment.from_wav(wav_path)
-    chunk_ms = chunk_minutes * 60 * 1000 
+    chunk_ms = chunk_minutes * 60 * 1000
     chunks = []
     for i, start in enumerate(range(0,len(audio),chunk_ms)):
         chunk = audio[start : start + chunk_ms]
