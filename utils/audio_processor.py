@@ -42,7 +42,12 @@ def download_yt_audio(url: str) -> str:
             }
         ],
         "quiet": True,
+        "extractor_args": {"youtube": ["player_client=android"]},
     }
+    
+    # If the user has provided a cookies.txt file in the root directory, use it
+    if os.path.exists("cookies.txt"):
+        ydl_opts["cookiefile"] = "cookies.txt"
     # Point yt-dlp straight at the ffmpeg binary dir so its postprocessor
     # doesn't depend on PATH being set correctly in the Render environment.
     if os.path.isdir(_LOCAL_BIN):
