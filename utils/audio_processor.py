@@ -1,4 +1,5 @@
 import os
+import shutil
 
 try:
     import yt_dlp
@@ -12,6 +13,18 @@ except Exception:  # pragma: no cover - handles environments where pydub import 
 
 DOWNLOAD_DIR = 'downloades'
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# render_build.sh installs a static ffmpeg/ffprobe binary into ~/.local/bin.
+# We point pydub + yt-dlp at that path explicitly instead of relying on PATH,
+# since PATH isn't always propagated the same way to the uvicorn process on Render.
+_LOCAL_BIN = os.path.expanduser("~/.local/bin")
+FFMPEG_PATH = shutil.which("ffmpeg") or os.path.join(_LOCAL_BIN, "ffmpeg")
+FFPROBE_PATH = shutil.which("ffprobe") or os.path.join(_LOCAL_BIN, "ffprobe")
+
+if AudioSegment is not None and os.path.exists(FFMPEG_PATH):
+    AudioSegment.converter = FFMPEG_PATH
+    AudioSegment.ffprobe = FFPROBE_PATH
+
 
 def download_yt_audio(url: str) -> str:
     if yt_dlp is None:
@@ -30,6 +43,11 @@ def download_yt_audio(url: str) -> str:
         ],
         "quiet": True,
     }
+    # Point yt-dlp straight at the ffmpeg binary dir so its postprocessor
+    # doesn't depend on PATH being set correctly in the Render environment.
+    if os.path.isdir(_LOCAL_BIN):
+        ydl_opts["ffmpeg_location"] = _LOCAL_BIN
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info).replace(".webm", ".wav").replace(".m4a", ".wav")
@@ -55,27 +73,28 @@ def chunk_audio(wav_path: str, chunk_minutes: int = 10) -> list:
     audio = AudioSegment.from_wav(wav_path)
     chunk_ms = chunk_minutes * 60 * 1000
     chunks = []
-    for i, start in enumerate(range(0,len(audio),chunk_ms)):
-        chunk = audio[start : start + chunk_ms]
+    for i, start in enumerate(range(0, len(audio), chunk_ms)):
+        chunk = audio[start: start + chunk_ms]
         chunk_path = f"{wav_path}_chunk_{i}.wav"
-        chunk.export(chunk_path , format = "wav")
-        chunks.append({"path": chunk_path, "start": start}) 
+        chunk.export(chunk_path, format="wav")
+        chunks.append({"path": chunk_path, "start": start})
     return chunks
 
-def process_input(source: str) -> list:
-    lightweight = os.getenv("LIGHTWEIGHT_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
 
-    if lightweight or AudioSegment is None or yt_dlp is None:
-        print("Lightweight mode or audio dependencies unavailable. Skipping heavy audio preprocessing.")
-        if source.startswith("http://") or source.startswith("https://"):
-            try:
-                wav_path = download_yt_audio(source)
-            except Exception as exc:
-                print(f"Audio download skipped: {exc}")
-                wav_path = source
-        else:
-            wav_path = source
-        return [{"path": wav_path, "start": 0}]
+def process_input(source: str) -> list:
+    """
+    Download/convert/chunk the source into WAV pieces we can transcribe.
+
+    NOTE: this step is NOT heavy (no torch, no ML model loading) — it's just
+    yt-dlp + ffmpeg + pydub, all of which are in requirements.render.txt.
+    It must always run for real, in both local and lightweight/Render mode.
+    LIGHTWEIGHT_MODE only affects which transcription engine is used
+    afterwards (see core/transcriber.py), not this step.
+    """
+    if AudioSegment is None or yt_dlp is None:
+        # True last-resort fallback: dependencies genuinely missing.
+        print("Audio dependencies unavailable. Skipping preprocessing.")
+        return [{"path": source, "start": 0}]
 
     if source.startswith("http://") or source.startswith("https://"):
         print("Detected YouTube URL. Downloading audio...")

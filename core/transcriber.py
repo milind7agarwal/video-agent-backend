@@ -26,14 +26,20 @@ def is_lightweight_mode() -> bool:
     return value in {"1", "true", "yes", "on"}
 
 
+def _use_sarvam() -> bool:
+    # Sarvam's STT-translate endpoint transcribes ANY spoken language and
+    # returns English text, so it's a valid transcription engine regardless
+    # of whether the source audio is English or Hinglish. We use it whenever
+    # local Whisper isn't available (lightweight/Render deploy), instead of
+    # only for "hinglish" as before.
+    return is_lightweight_mode() or whisper is None
+
+
 _model = None
 
 
 def load_model():
     global _model
-
-    if is_lightweight_mode():
-        return None
 
     if whisper is None:
         raise RuntimeError("Whisper is not installed. Install it or enable LIGHTWEIGHT_MODE=true.")
@@ -46,22 +52,6 @@ def load_model():
 
 
 def transcribe_chunk_whisper(chunk_path: str) -> list:
-    if is_lightweight_mode():
-        try:
-            if AudioSegment is not None:
-                audio = AudioSegment.from_wav(chunk_path)
-                duration_s = max(len(audio) / 1000.0, 1.0)
-            else:
-                duration_s = 1.0
-        except Exception:
-            duration_s = 1.0
-
-        message = (
-            "Lightweight mode enabled. Full transcription was skipped to reduce memory use. "
-            f"Audio duration: {duration_s:.1f}s."
-        )
-        return [{"start": 0.0, "end": duration_s, "text": message}]
-
     try:
         model = load_model()
         result = model.transcribe(chunk_path, task="transcribe")
@@ -94,13 +84,23 @@ def _send_to_sarvam(piece_path: str) -> str:
     return response.json().get("transcript", "")
 
 
-def transcribe_chunk_sarvam(chunk_path: str) -> str:
+def transcribe_chunk_sarvam(chunk_path: str) -> list:
     """
     Sarvam sync API only accepts ≤30s audio. We split this chunk into
     25-second pieces, send each separately, and join the transcripts.
+    Works for English and Hinglish (and most other spoken languages) —
+    the API always returns English text.
     """
     if not SARVAM_API_KEY:
-        return [{"start": 0.0, "end": 0.0, "text": "Sarvam API key not configured. Lightweight mode skipped transcription."}]
+        return [{
+            "start": 0.0,
+            "end": 0.0,
+            "text": (
+                "SARVAM_API_KEY is not configured on the server, so no real "
+                "transcription could be produced. Set SARVAM_API_KEY as an "
+                "environment variable and reprocess this video."
+            ),
+        }]
 
     if AudioSegment is None:
         return [{"start": 0.0, "end": 0.0, "text": "pydub is unavailable, so transcription could not run."}]
@@ -128,11 +128,11 @@ def transcribe_chunk_sarvam(chunk_path: str) -> str:
 
 def transcribe_chunk(chunk_path: str, language: str = "english") -> list:
     """
-    Route one chunk to Whisper or Sarvam depending on language choice.
-    - english  → Whisper (local model)
-    - hinglish → Sarvam (translates to English while transcribing)
+    Route one chunk to Whisper (local) or Sarvam (hosted), depending on
+    what's actually available in this deployment — not on the requested
+    language. Sarvam handles English audio just fine.
     """
-    if language.lower() == "hinglish":
+    if _use_sarvam():
         return transcribe_chunk_sarvam(chunk_path)
     return transcribe_chunk_whisper(chunk_path)
 
@@ -141,7 +141,7 @@ def transcribe_all(chunks: list, language: str = "english") -> dict:
     all_segments = []
     full_transcript = ""
 
-    engine = "Sarvam AI" if language.lower() == "hinglish" else "Whisper"
+    engine = "Sarvam AI (hosted)" if _use_sarvam() else "Whisper (local)"
     print(f"Using {engine} for transcription.")
 
     for i, chunk_info in enumerate(chunks):
