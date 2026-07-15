@@ -1,5 +1,6 @@
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+import shutil
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -33,12 +34,35 @@ class ChatRequest(BaseModel):
 rag_chain_instance = None
 
 @app.post("/api/process")
-def process_video(req: ProcessRequest):
+async def process_video(
+    file: UploadFile = File(None), 
+    source: str = Form(None), 
+    language: str = Form("english")
+):
     global rag_chain_instance
     try:
         print("Starting AI Video Assistant processing")
-        chunks = process_input(req.source)
-        transcript_data = transcribe_all(chunks, req.language)
+        
+        # 1. Check if a raw video file was uploaded
+        if file:
+            print(f"Received uploaded file: {file.filename}")
+            # Securely save the uploaded file stream into Render's designated /tmp directory
+            os.makedirs("/tmp/uploads", exist_ok=True)
+            input_source = os.path.join("/tmp/uploads", file.filename)
+            
+            with open(input_source, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+                
+        # 2. Fall back to a text URL if no file was uploaded
+        elif source:
+            print(f"Received source text/URL: {source}")
+            input_source = source
+        else:
+            raise HTTPException(status_code=400, detail="No video file or YouTube URL provided.")
+
+        # Process the local /tmp file path or URL
+        chunks = process_input(input_source)
+        transcript_data = transcribe_all(chunks, language)
         transcript_text = transcript_data["text"]
         transcript_segments = transcript_data["segments"]
 
@@ -49,6 +73,10 @@ def process_video(req: ProcessRequest):
         open_questions = extract_questions(transcript_text)
         
         rag_chain_instance = build_rag_chain(transcript_segments)
+
+        # Cleanup the original raw file from /tmp to save RAM/Disk space
+        if file and os.path.exists(input_source):
+            os.remove(input_source)
 
         return {
             "title": title,

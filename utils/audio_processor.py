@@ -3,7 +3,7 @@ import yt_dlp
 from pydub import AudioSegment
 
 # FIX: Path spelling correction
-DOWNLOAD_DIR = 'downloads'
+DOWNLOAD_DIR = '/tmp/downloads'
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 # DEPLOYMENT TRICK: Tell pydub where to look for local FFmpeg binaries when hosted on Render
