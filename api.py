@@ -14,10 +14,18 @@ load_dotenv()
 
 app = FastAPI()
 
+
+def get_allowed_origins():
+    raw = os.getenv("ALLOWED_ORIGINS", "*").strip()
+    if not raw or raw == "*":
+        return ["*"]
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=get_allowed_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -31,6 +39,12 @@ class ChatRequest(BaseModel):
 
 # Global variable to hold the rag chain in memory for chat endpoint
 rag_chain_instance = None
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "lightweight_mode": os.getenv("LIGHTWEIGHT_MODE", "").strip().lower() in {"1", "true", "yes", "on"}}
+
 
 @app.post("/api/process")
 def process_video(req: ProcessRequest):

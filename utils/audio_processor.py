@@ -63,6 +63,20 @@ def chunk_audio(wav_path: str, chunk_minutes: int = 10) -> list:
     return chunks
 
 def process_input(source: str) -> list:
+    lightweight = os.getenv("LIGHTWEIGHT_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
+
+    if lightweight or AudioSegment is None or yt_dlp is None:
+        print("Lightweight mode or audio dependencies unavailable. Skipping heavy audio preprocessing.")
+        if source.startswith("http://") or source.startswith("https://"):
+            try:
+                wav_path = download_yt_audio(source)
+            except Exception as exc:
+                print(f"Audio download skipped: {exc}")
+                wav_path = source
+        else:
+            wav_path = source
+        return [{"path": wav_path, "start": 0}]
+
     if source.startswith("http://") or source.startswith("https://"):
         print("Detected YouTube URL. Downloading audio...")
         wav_path = download_yt_audio(source)
