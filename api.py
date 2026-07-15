@@ -62,7 +62,7 @@ def process_video(req: ProcessRequest):
         key_decisions = extract_key_decisions(transcript_text)
         open_questions = extract_questions(transcript_text)
         
-        rag_chain_instance = build_rag_chain(transcript_segments)
+        rag_chain_instance = build_rag_chain(transcript_text)
 
         return {
             "title": title,
