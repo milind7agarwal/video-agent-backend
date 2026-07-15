@@ -14,18 +14,10 @@ load_dotenv()
 
 app = FastAPI()
 
-
-def get_allowed_origins():
-    raw = os.getenv("ALLOWED_ORIGINS", "*").strip()
-    if not raw or raw == "*":
-        return ["*"]
-    return [origin.strip() for origin in raw.split(",") if origin.strip()]
-
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_allowed_origins(),
-    allow_credentials=False,
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -39,12 +31,6 @@ class ChatRequest(BaseModel):
 
 # Global variable to hold the rag chain in memory for chat endpoint
 rag_chain_instance = None
-
-
-@app.get("/health")
-def health_check():
-    return {"status": "ok", "lightweight_mode": os.getenv("LIGHTWEIGHT_MODE", "").strip().lower() in {"1", "true", "yes", "on"}}
-
 
 @app.post("/api/process")
 def process_video(req: ProcessRequest):
@@ -62,7 +48,7 @@ def process_video(req: ProcessRequest):
         key_decisions = extract_key_decisions(transcript_text)
         open_questions = extract_questions(transcript_text)
         
-        rag_chain_instance = build_rag_chain(transcript_text)
+        rag_chain_instance = build_rag_chain(transcript_segments)
 
         return {
             "title": title,
@@ -94,5 +80,4 @@ def chat(req: ChatRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", "8000"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

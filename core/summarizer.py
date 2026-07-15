@@ -1,48 +1,24 @@
-import os
+from langchain_mistralai import ChatMistralAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 
-try:
-    from langchain_mistralai import ChatMistralAI
-except ImportError:  # pragma: no cover - optional dependency
-    ChatMistralAI = None
-
-try:
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain_core.output_parsers import StrOutputParser
-    from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-except ImportError:  # pragma: no cover - optional dependency
-    ChatPromptTemplate = None
-    StrOutputParser = None
-    RunnablePassthrough = None
-    RunnableLambda = None
-
-try:
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-except ImportError:  # pragma: no cover - optional dependency
-    RecursiveCharacterTextSplitter = None
-
+import os 
 
 def get_llm():
-    api_key = os.getenv("MISTRAL_API_KEY")
-    if not api_key or ChatMistralAI is None:
-        return None
-    return ChatMistralAI(model="mistral-small-latest", mistral_api_key=api_key, temperature=0.3)
+    return ChatMistralAI(model = "mistral-small-latest", mistral_api_key = os.getenv("MISTRAL_API_KEY"),temperature=0.3)
 
 def split_transcript(transcript: str) -> list:
-    if RecursiveCharacterTextSplitter is None:
-        return [transcript]
-
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=3000,
-        chunk_overlap=200,
+        chunk_size = 3000,
+        chunk_overlap = 200
     )
 
     return splitter.split_text(transcript)
 
-def summarize(transcript: str) -> str:
+def summarize(transcript : str) -> str:
     llm = get_llm()
-    if llm is None or ChatPromptTemplate is None or StrOutputParser is None:
-        return "Summary generation is unavailable because the lightweight backend is running without the LLM stack."
-
     map_prompt = ChatPromptTemplate.from_messages(
         [
         ("system", "Summarize this portion of a meeting transcript concisely."),
@@ -69,11 +45,8 @@ def summarize(transcript: str) -> str:
 
     return combined_chain.invoke(combined)
 
-def generate_title(transcipt: str) -> str:
+def generate_title(transcipt : str) -> str:
     llm = get_llm()
-    if llm is None:
-        return "Untitled"
-
     title_chain = (
         RunnablePassthrough() | RunnableLambda(lambda x:{"text":x}) | 
         ChatPromptTemplate.from_messages([
@@ -89,3 +62,5 @@ def generate_title(transcipt: str) -> str:
     )
 
     return title_chain.invoke(transcipt[:2000])
+
+
