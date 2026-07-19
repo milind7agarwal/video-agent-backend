@@ -1,20 +1,19 @@
-import os 
-from langchain_chroma import Chroma 
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import os
+from langchain_chroma import Chroma
+from langchain_mistralai import MistralAIEmbeddings
 from langchain_core.documents import Document
 
 CHROMA_DIR = "vector_db"
 COLLECTION_NAME = "meeting_transcript"
-EMBEDDING_MODEL  = "all-MiniLM-L6-v2"
+EMBEDDING_MODEL = "mistral-embed"
 
 def get_embeddings():
-    return HuggingFaceEmbeddings(
-        model_name = EMBEDDING_MODEL,
-        model_kwargs = {"device" : 'cpu'}
+    return MistralAIEmbeddings(
+        model=EMBEDDING_MODEL,
+        mistral_api_key=os.getenv("MISTRAL_API_KEY"),
     )
 
-def build_vector_store(segments : list)->Chroma:
+def build_vector_store(segments: list) -> Chroma:
     print("Building vector Store")
 
     docs = []
@@ -27,12 +26,12 @@ def build_vector_store(segments : list)->Chroma:
         text = seg["text"].strip()
         if not text:
             continue
-        
+
         if chunk_start is None:
             chunk_start = seg["start"]
-        
+
         current_chunk_text += text + " "
-        
+
         if seg["end"] is not None:
             chunk_end = seg["end"]
 
@@ -58,7 +57,7 @@ def build_vector_store(segments : list)->Chroma:
 
     embeddings = get_embeddings()
     vector_store = Chroma.from_documents(
-        documents= docs,
+        documents=docs,
         embedding=embeddings,
         collection_name=COLLECTION_NAME,
         persist_directory=CHROMA_DIR
@@ -67,19 +66,18 @@ def build_vector_store(segments : list)->Chroma:
     return vector_store
 
 
-
-def load_vector_store() ->Chroma:
+def load_vector_store() -> Chroma:
     embeddings = get_embeddings()
     vector_store = Chroma(
         collection_name=COLLECTION_NAME,
-        embedding_function= embeddings,
+        embedding_function=embeddings,
         persist_directory=CHROMA_DIR
     )
 
     return vector_store
 
-def get_retriever(vector_store : Chroma, k :int = 4):
+def get_retriever(vector_store: Chroma, k: int = 4):
     return vector_store.as_retriever(
-        search_type = 'similarity',
-        search_kwargs = {"k":k}
+        search_type='similarity',
+        search_kwargs={"k": k}
     )

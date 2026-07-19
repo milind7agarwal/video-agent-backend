@@ -23,84 +23,48 @@ def format_docs(docs):
             formatted.append(doc.page_content)
     return "\n\n".join(formatted)
 
-def build_rag_chain(transcript:str):
+SYSTEM_PROMPT = """You are an expert meeting assistant. Answer the user's question 
+based ONLY on the meeting transcript context provided below.
 
-    vector_store = build_vector_store(transcript)
+If the answer is not found in the context, say: 
+"I could not find this information in the meeting transcript."
 
-    retriever = get_retriever(vector_store, k = 4)
+Always be concise and precise. If quoting someone, mention it clearly.
+When you provide information from the context, YOU MUST cite the timestamps in your response using the provided format (e.g., "[12.5 - 34.2]").
 
-    llm = get_llm()
+Context from meeting transcript:
+{context}"""
 
+def _build_chain(retriever, llm):
     prompt = ChatPromptTemplate.from_messages(
-
-        [(
-            "system",
-            """You are an expert meeting assistant. Answer the user's question 
-            based ONLY on the meeting transcript context provided below.
-
-            If the answer is not found in the context, say: 
-            "I could not find this information in the meeting transcript."
-
-            Always be concise and precise. If quoting someone, mention it clearly.
-            When you provide information from the context, YOU MUST cite the timestamps in your response using the provided format (e.g., "[12.5 - 34.2]").
-
-            Context from meeting transcript:
-            {context}""",
-        ),
-        ("human", "{question}"),
-    ]
+        [
+            ("system", SYSTEM_PROMPT),
+            ("human", "{question}"),
+        ]
     )
 
-    #full LCEL Rag pipeline 
-
-    rag_chain = (
-
-        {"context" : retriever | RunnableLambda(format_docs),
+    return (
+        {"context": retriever | RunnableLambda(format_docs),
          "question": RunnablePassthrough()
          }
-         |prompt|llm|StrOutputParser()
+        | prompt | llm | StrOutputParser()
     )
 
-    return rag_chain
+def build_rag_chain(transcript: str):
+    vector_store = build_vector_store(transcript)
+    retriever = get_retriever(vector_store, k=4)
+    llm = get_llm()
+    return _build_chain(retriever, llm)
 
 
 def load_rag_chain():
     vector_store = load_vector_store()
-    retriver = get_retriever()
-
+    retriever = get_retriever(vector_store, k=4)
     llm = get_llm()
-    prompt = ChatPromptTemplate.from_messages([
-        (
-            "system",
-            """You are an expert meeting assistant. Answer the user's question 
-            based ONLY on the meeting transcript context provided below.
-
-            If the answer is not found in the context, say: 
-            "I could not find this information in the meeting transcript."
-
-            Always be concise and precise. If quoting someone, mention it clearly.
-            When you provide information from the context, YOU MUST cite the timestamps in your response using the provided format (e.g., "[12.5 - 34.2]").
-
-            Context from meeting transcript:
-            {context}""",
-            ),
-            ("human", "{question}"),
-    ])
-
-    rag_chain = (
-        {
-            "context":  retriver| RunnableLambda(format_docs),
-            "question": RunnablePassthrough(),
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-
-    return rag_chain
+    return _build_chain(retriever, llm)
 
 
-def ask_question(rag_chain, question:str) -> str:
+def ask_question(rag_chain, question: str) -> str:
     print(f"Question : {question}")
     answer = rag_chain.invoke(question)
     print(f"answer :{answer}")
