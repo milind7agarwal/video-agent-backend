@@ -5,6 +5,7 @@
 yt-dlp>=2024.4.9                  # Download audio from YouTube URLs
 pydub>=0.25.1                     # Audio file manipulation / format conversion
 ffmpeg-python>=0.2.0              # FFmpeg bindings (FFmpeg binary must be installed separately)
+audioop-lts>=0.2.1
 
 # ── Speech-to-Text (Sarvam API) ────────────────────────────────────────────────
 # (handled via `requests`, already listed below — no extra SDK needed)
