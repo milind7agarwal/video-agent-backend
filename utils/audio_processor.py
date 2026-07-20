@@ -6,6 +6,23 @@ import os
 DOWNLOAD_DIR = 'downloades'
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+# Render mounts Secret Files at /etc/secrets/<filename>, which is READ-ONLY.
+# yt-dlp needs to write updated cookies back after each request, so we copy
+# the secret file into a writable location once and point yt-dlp at the copy.
+SOURCE_COOKIES_PATH = os.getenv("YT_COOKIES_PATH", "/etc/secrets/cookies.txt")
+WRITABLE_COOKIES_PATH = "/tmp/cookies.txt"
+
+
+def _get_writable_cookies_path():
+    if not os.path.exists(SOURCE_COOKIES_PATH):
+        return None
+    # Refresh the writable copy from the secret each call, so edits to the
+    # secret file (e.g. re-exporting fresh cookies) take effect on redeploy.
+    if not os.path.exists(WRITABLE_COOKIES_PATH):
+        shutil.copyfile(SOURCE_COOKIES_PATH, WRITABLE_COOKIES_PATH)
+    return WRITABLE_COOKIES_PATH
+
+
 def download_yt_audio(url: str) -> str:
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
     ydl_opts = {
@@ -20,6 +37,13 @@ def download_yt_audio(url: str) -> str:
         ],
         "quiet": True,
     }
+
+    cookies_path = _get_writable_cookies_path()
+    if cookies_path:
+        print(f"Using cookies file at {cookies_path}")
+        ydl_opts["cookiefile"] = cookies_path
+    else:
+        print(f"⚠️  No cookies file found at {SOURCE_COOKIES_PATH} — YouTube may block this as a bot.")
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
