@@ -36,9 +36,6 @@ def download_yt_audio(url: str) -> str:
             }
         ],
         "quiet": True,
-        "extractor_args": {
-            "youtube": {"player_client": ["web", "android"]}
-        },
     }
 
     cookies_path = _get_writable_cookies_path()
@@ -46,7 +43,7 @@ def download_yt_audio(url: str) -> str:
         print(f"Using cookies file at {cookies_path}")
         ydl_opts["cookiefile"] = cookies_path
     else:
-        print(f"⚠️  No cookies file found at {SOURCE_COOKIES_PATH} — YouTube may block this as a bot.")
+        print(f"No cookies file found at {SOURCE_COOKIES_PATH} — YouTube may block this as a bot.")
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
