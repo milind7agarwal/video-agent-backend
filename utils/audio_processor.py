@@ -3,9 +3,14 @@ from pydub import AudioSegment
 import os
 
 DOWNLOAD_DIR = 'downloades'
-os.makedirs(DOWNLOAD_DIR,exist_ok = True)
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-def download_yt_audio(url:str)->str:
+# Render "Secret Files" mount at this path by default. Only used if it exists,
+# so local dev without cookies still works fine.
+COOKIES_PATH = os.getenv("YT_COOKIES_PATH", "/etc/secrets/cookies.txt")
+
+
+def download_yt_audio(url: str) -> str:
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
     ydl_opts = {
         "format": "bestaudio/best",
@@ -19,6 +24,12 @@ def download_yt_audio(url:str)->str:
         ],
         "quiet": True,
     }
+
+    if os.path.exists(COOKIES_PATH):
+        ydl_opts["cookiefile"] = COOKIES_PATH
+    else:
+        print("⚠️  No cookies file found — YouTube may block this request as a bot.")
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filename = ydl.prepare_filename(info).replace(".webm", ".wav").replace(".m4a", ".wav")
@@ -29,21 +40,22 @@ def convert_to_wav(input_path: str) -> str:
     """Convert any audio/video file to WAV format using pydub."""
     output_path = os.path.splitext(input_path)[0] + "_converted.wav"
     audio = AudioSegment.from_file(input_path)
-    audio = audio.set_channels(1).set_frame_rate(16000) #16khz
+    audio = audio.set_channels(1).set_frame_rate(16000)  # 16khz
     audio.export(output_path, format="wav")
     return output_path
 
 
-def chunk_audio(wav_path : str , chunk_minutes : int = 10) -> list:
+def chunk_audio(wav_path: str, chunk_minutes: int = 10) -> list:
     audio = AudioSegment.from_wav(wav_path)
-    chunk_ms = chunk_minutes * 60 * 1000 
+    chunk_ms = chunk_minutes * 60 * 1000
     chunks = []
-    for i, start in enumerate(range(0,len(audio),chunk_ms)):
-        chunk = audio[start : start + chunk_ms]
+    for i, start in enumerate(range(0, len(audio), chunk_ms)):
+        chunk = audio[start: start + chunk_ms]
         chunk_path = f"{wav_path}_chunk_{i}.wav"
-        chunk.export(chunk_path , format = "wav")
-        chunks.append({"path": chunk_path, "start": start}) 
+        chunk.export(chunk_path, format="wav")
+        chunks.append({"path": chunk_path, "start": start})
     return chunks
+
 
 def process_input(source: str) -> list:
     if source.startswith("http://") or source.startswith("https://"):
